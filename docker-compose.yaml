@@ -1,0 +1,54 @@
+services:
+  backend:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy  # <--- UPGRADE: Wait for DB to be ready, not just started
+      caching:
+        condition: service_healthy  # <--- UPGRADE: Wait for Cache to be
+    ports:
+      - "8080:80"
+    volumes:
+      - ./my-backend-data:/usr/share/nginx/html  # <--- NEED THIS
+        
+  frontend:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./my-frontend-data:/usr/share/nginx/html  # <--- NEED THIS
+   
+  database:
+    image: postgres:15
+    restart: unless-stopped
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: username
+      POSTGRES_DB: mydatabase
+    healthcheck:                          # <--- FIXED: Now properly inside 'database'
+      test: ["CMD-SHELL", "pg_isready -U username -d mydatabase"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:                              # <--- FIXED: Now properly inside 'database'
+      - postgres_data:/var/lib/postgresql/data
+  caching:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+volumes:
+  my_backend_data:
+  my_frontend_data:
+  postgres_data:
